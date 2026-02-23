@@ -631,7 +631,7 @@ def plot_gene_expression_series(adata, genes, group_key='infection_group',
 
         ax.set_xticks(x_pos)
         ax.set_xticklabels(short_labels, fontsize=14)
-        ax.set_ylabel('Expression Level', fontsize=10, fontweight='bold')
+        ax.set_ylabel('Log Expression', fontsize=10, fontweight='bold')
         ax.set_xlabel('Infection Group', fontsize=12, fontweight='bold')
         
         # Panel Letter and Title: (a) GeneName
