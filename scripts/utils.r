@@ -141,25 +141,18 @@ analyze_save <- function(dds_obj, condition , coefficient, control, save_path , 
   
   message(paste("Processing:", coefficient, "versus", control, "..."))
   
-  # Contrast 설정
-  # condition 컬럼에 timepoint와 Control이 있어야 합니다.
   res <- results(dds_obj, contrast = c(condition, coefficient, control))
   
-  # padj 기준으로 정렬
   res_ordered <- res[order(res$padj), ]
 
   res_df <- res_ordered %>%
     as.data.frame() %>%
     tibble::rownames_to_column(var = "Gene_symbol")
   
-  # Significant DEG 필터링
-  # data.frame 변환 -> padj 필터 -> LFC 절대값 필터
   sig_deg <- res_df %>%
     as.data.frame() %>%
     dplyr::filter(padj < padj_cutoff & abs(log2FoldChange) > lfc_cutoff)
   
-  # 파일 저장 (전체 결과 및 DEG 결과)
-  # 파일명에 timepoint와 cutoff 정보를 포함시키는 것이 관리에 좋습니다.
   write.csv(res_df, file = paste0(save_path, "DEG_results_", coefficient, "_vs_", control, ".csv"), row.names = FALSE, col.names = TRUE)
   write.csv(sig_deg, file = paste0(save_path, "Sig_DEG_", coefficient, "_vs_", control, "_LFC", lfc_cutoff, ".csv"), row.names = FALSE, col.names = TRUE)
   
