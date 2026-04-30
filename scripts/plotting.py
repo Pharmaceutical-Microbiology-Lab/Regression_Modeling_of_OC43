@@ -14,7 +14,6 @@ from adjustText import adjust_text
 # ===================================================================
 # [Global Project Style Settings]
 # ===================================================================
-# 논문 전체에서 공통으로 사용할 색상과 순서 정의
 SC_COLORS = {
     'No infection': '#4A90E2', 
     'Low infection': '#F5A623', 
@@ -30,6 +29,11 @@ def set_publication_style():
     plt.rcParams['pdf.fonttype'] = 42
     plt.rcParams['ps.fonttype'] = 42
 
+
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.metrics import r2_score
 
 def plot_performance_scatter(y_true, y_pred, 
                              xlabel='Actual value', 
@@ -58,55 +62,56 @@ def plot_performance_scatter(y_true, y_pred,
     save_path : str, optional
         If provided, saves the figure to this path.
     """
-    def _truncate_value(n, decimals=3):
+    def _truncate_value(n, decimals=4):
         if n is None: return 0
         factor = 10.0 ** decimals
         return np.trunc(n * factor) / factor
     
-    # 1. 데이터 타입 정리 (Pandas Series 등이 들어와도 처리되도록)
+    # 1. Format data types (Handle Pandas Series, etc.)
     y_true = np.array(y_true).flatten()
     y_pred = np.array(y_pred).flatten()
 
-    # 2. 성능 지표 계산
+    # 2. Calculate performance metrics
     r2 = r2_score(y_true, y_pred)
     rmse = np.sqrt(np.mean((y_true - y_pred)**2))
     mae = np.mean(np.abs(y_true - y_pred))
 
-    # 3. Figure 준비 (ax가 없으면 새로 생성)
+    # 3. Prepare Figure (Create a new one if ax is not provided)
     if ax is None:
         fig, ax = plt.subplots(figsize=(5, 5), dpi=300)
     else:
         fig = ax.figure
 
-    # 4. 산점도 (Scatter Plot)
+    # 4. Scatter Plot
     ax.scatter(y_true, y_pred, 
                s=20, alpha=0.4, color='#FF8C42', 
                edgecolors='none', label='Predictions',
-               rasterized=True) # 점이 많을 경우 벡터 그래픽 용량 최적화
+               rasterized=True) # Optimize vector graphics file size for large datasets
 
-    # 5. 회귀선 (Regression Line)
+    # 5. Regression Line
     sns.regplot(x=y_true, y=y_pred, 
                 scatter=False, color='#C41E3A', 
                 line_kws={'linewidth': 2, 'label': 'Regression line'},
                 ax=ax)
 
-    # 6. 완전 일치선 (Identity Line, y=x)
+    # 6. Identity Line (y=x)
     min_val = min(y_true.min(), y_pred.min())
     max_val = max(y_true.max(), y_pred.max())
-    # 여백을 약간 둠
+    
+    # Add slight margins
     margin = (max_val - min_val) * 0.05
     ax.plot([min_val - margin, max_val + margin], 
             [min_val - margin, max_val + margin], 
             'k--', linewidth=1.5, alpha=0.5, label='Perfect prediction')
 
-    # 7. 라벨 및 텍스트 설정
+    # 7. Set labels and text
     ax.set_xlabel(xlabel, fontsize=11, fontweight='bold')
     ax.set_ylabel(ylabel, fontsize=11, fontweight='bold')
     if title:
         ax.set_title(title, fontsize=12, fontweight='bold', pad=15)
 
-    # 통계 박스
-    textstr = (f'$R^2$ = {_truncate_value(r2):.3f}\n'
+    # Statistics text box
+    textstr = (f'$R^2$ = {_truncate_value(r2):.4f}\n'  # Changed to 4 decimal places
                f'RMSE = {_truncate_value(rmse):.3f}\n'
                f'MAE = {_truncate_value(mae):.3f}\n'
                f'n = {len(y_true):,}')
@@ -114,7 +119,7 @@ def plot_performance_scatter(y_true, y_pred,
     ax.text(0.05, 0.95, textstr, transform=ax.transAxes, fontsize=9,
             verticalalignment='top', bbox=props, family='monospace')
 
-    # 8. 스타일 및 범례
+    # 8. Style and legend
     ax.grid(True, linestyle='--', alpha=0.3, linewidth=0.8, color='gray')
     ax.set_axisbelow(True)
     ax.legend(loc='lower right', frameon=True, fancybox=False, 
@@ -123,7 +128,7 @@ def plot_performance_scatter(y_true, y_pred,
     ax.tick_params(axis='both', which='major', labelsize=10, 
                    width=1.2, length=5, direction='out')
 
-    # 9. 저장 (옵션)
+    # 9. Save (Optional)
     if save_path:
         plt.tight_layout()
         fig.savefig(save_path, dpi=300, bbox_inches='tight')
