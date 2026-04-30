@@ -40,8 +40,7 @@ def tune_feature_weights(X, y, feature_names, seed, initial_weights=None, n_tria
         # 1. Suggest weights
         weights = []
         for gene in feature_names:
-            # Range: [0.5, 10.0]
-            w = trial.suggest_float(f"weight_{gene}", 0.5, 12.0)
+            w = trial.suggest_float(f"weight_{gene}", 0.5, 15.0)
             weights.append(w)
 
         # 2. Define Model
@@ -52,6 +51,8 @@ def tune_feature_weights(X, y, feature_names, seed, initial_weights=None, n_tria
             random_state=seed,
             verbose=0,
             feature_weights=weights,
+            task_type='CPU',     
+            thread_count=-1,
             allow_writing_files=False # Prevent creating catboost_info folder
         )
 
@@ -74,7 +75,7 @@ def tune_feature_weights(X, y, feature_names, seed, initial_weights=None, n_tria
 
     # Run Optimization
     print(f"🚀 Starting Feature Weight Optimization ({n_trials} trials)...")
-    optuna.logging.set_verbosity(optuna.logging.WARNING) # Suppress generic logs
+    optuna.logging.set_verbosity(optuna.logging.INFO) # Suppress generic logs
     study.optimize(objective, n_trials=n_trials)
     
     print(f"✅ Optimization Complete. Best R2: {study.best_value:.4f}")
@@ -133,6 +134,8 @@ def tune_hyperparameters(X, y, seed, feature_weights=None, n_trials=100,
             random_state=seed,
             verbose=0,
             feature_weights=weights_list, # Fixed weights
+            task_type='CPU',
+            thread_count=-1,
             depth=depth,
             l2_leaf_reg=l2_leaf_reg,
             learning_rate=learning_rate,
@@ -145,7 +148,7 @@ def tune_hyperparameters(X, y, seed, feature_weights=None, n_trials=100,
         return scores.mean()
 
     print(f"🚀 Starting Hyperparameter Tuning ({n_trials} trials)...")
-    optuna.logging.set_verbosity(optuna.logging.WARNING)
+    optuna.logging.set_verbosity(optuna.logging.INFO)
     
     sampler = TPESampler(seed=seed) 
     study = optuna.create_study(direction='maximize', sampler=sampler)
