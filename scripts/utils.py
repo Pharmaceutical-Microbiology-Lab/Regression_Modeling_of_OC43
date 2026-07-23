@@ -87,18 +87,18 @@ def basic_qc_filter(adata, pct_mt_max=20.0, min_genes=2000, min_cells=3,
 
     # Mitochondrial percentage threshold
     if 'pct_counts_mt' in adata.obs:
-        keep &= adata.obs['pct_counts_mt'] < pct_mt_max
+        keep &= (adata.obs['pct_counts_mt'] < pct_mt_max).to_numpy()
 
     # Condition-based filtering (Doublets, Unassigned)
     if 'condition' in adata.obs:
         if drop_doublet:
-            keep &= adata.obs['condition'].astype(str) != 'doublet'
+            keep &= (adata.obs['condition'].astype(str) != 'doublet').to_numpy()
         if drop_unassigned:
-            keep &= adata.obs['condition'].astype(str) != 'unassigned'
+            keep &= (adata.obs['condition'].astype(str) != 'unassigned').to_numpy()
 
     adata = adata[keep].copy()
     
-    print(f"✅ Filtering complete. Remaining cells: {adata.n_obs}, Genes: {adata.n_vars}")
+    print(f"Filtering complete. Remaining cells: {adata.n_obs}, Genes: {adata.n_vars}")
     return adata
 
 def normalize_log1p(adata, target_sum=1e4):

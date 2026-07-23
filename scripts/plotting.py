@@ -1,15 +1,17 @@
+import time
 import matplotlib.pyplot as plt
+import matplotlib.colors as mcolors
+import matplotlib.ticker as ticker
+import matplotlib.patches as mpatches
+from matplotlib.lines import Line2D
 import seaborn as sns
 import numpy as np
-from sklearn.metrics import r2_score
-import time
-from sklearn.model_selection import learning_curve
-import scanpy as sc
-import matplotlib.ticker as ticker
 import pandas as pd
-import matplotlib.patches as mpatches
+import scanpy as sc
 import shap
 from adjustText import adjust_text
+from sklearn.metrics import r2_score
+from sklearn.model_selection import learning_curve, KFold
 
 # ===================================================================
 # [Global Project Style Settings]
@@ -22,18 +24,13 @@ SC_COLORS = {
 SC_ORDER = ['No infection', 'Low infection', 'High infection']
 
 def set_publication_style():
-    """기본 폰트 및 스타일 설정"""
+    """Set plot style"""
     plt.rcParams['font.family'] = 'Arial'
     plt.rcParams['font.size'] = 12
     plt.rcParams['axes.linewidth'] = 1.2
     plt.rcParams['pdf.fonttype'] = 42
     plt.rcParams['ps.fonttype'] = 42
 
-
-import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from sklearn.metrics import r2_score
 
 def plot_performance_scatter(y_true, y_pred, 
                              xlabel='Actual value', 
@@ -158,14 +155,16 @@ def plot_learning_curve(model, X, y, cv=5, train_sizes=np.linspace(0.1, 1.0, 10)
     print("Generating learning curve...")
     start_time = time.time()
 
+    if isinstance(cv, int):
+        cv = KFold(n_splits=cv, shuffle=True, random_state=42)
+
     # Calculate learning curve
     train_sizes_abs, train_scores, val_scores = learning_curve(
         model, X, y,
         train_sizes=train_sizes,
         cv=cv,
         scoring='r2',
-        n_jobs=-1,
-        random_state=42
+        n_jobs=-1
     )
 
     # Calculate statistics
@@ -251,7 +250,7 @@ def plot_gene_violin_overlay(adata, genes, group_key='infection_group',
     # 3. FIX: Convert dict palette to an ordered LIST based on the 'order' parameter
     # This bypasses any internal categorical ordering issues in Seaborn/Pandas
     if isinstance(palette, dict):
-        ordered_colors = [palette[group] for group in order]
+        ordered_colors = [palette.get(group, '#d3d3d3') for group in order]
     else:
         ordered_colors = palette # Fallback if already a list or string
 
@@ -313,13 +312,6 @@ def plot_gene_violin_overlay(adata, genes, group_key='infection_group',
 
     return fig, axes
 
-import matplotlib.pyplot as plt
-import matplotlib.colors as mcolors
-from matplotlib.lines import Line2D
-import seaborn as sns
-import numpy as np
-import pandas as pd
-import scanpy as sc
 
 def plot_umap_categorical(adata, color_var, seed, palette=None, title=None, 
                           figsize=(7, 6), save_path=None):
@@ -669,168 +661,6 @@ def plot_gene_expression_series(adata, genes, group_key='infection_group',
 
     return fig, axes
 
-def plot_directed_paga_trajectory(adata_sc, adata_bulk=None, 
-                                  sc_group_col='infection_group',
-                                  sc_pseudotime_key='dpt_pseudotime',
-                                  bulk_group_col='hpi', 
-                                  sc_colors=SC_COLORS,
-                                  sc_order=SC_ORDER,
-                                  bulk_colors=None, 
-                                  bulk_order=None, 
-                                  paga_resolution=1.0,
-                                  threshold=0.05,
-                                  figsize=(12, 10),
-                                  title="", 
-                                  save_path=None):
-    """
-    Plots a directed PAGA trajectory on UMAP, highlighting the root (start) node 
-    and optionally projecting bulk data points.
-
-    Parameters
-    ----------
-    adata_sc : AnnData
-        Single-cell AnnData with UMAP and pseudotime.
-    adata_bulk : AnnData, optional
-        Bulk AnnData projected onto the same UMAP space.
-    sc_group_col : str
-        Column in adata_sc.obs for background cell coloring.
-    sc_pseudotime_key : str
-        Column in adata_sc.obs containing pseudotime values.
-    bulk_group_col : str
-        Column in adata_bulk.obs for bulk point coloring.
-    sc_colors : dict, optional
-        Color map for single-cell groups.
-    bulk_colors : dict, optional
-        Color map for bulk groups.
-    bulk_order : list, optional
-        Order of bulk groups in the legend.
-    paga_resolution : float
-        Resolution for Leiden clustering used in PAGA.
-    threshold : float
-        Connectivity threshold for drawing edges between clusters.
-    title : str
-        Title for plot
-    save_path : str, optional
-        Path to save the figure (without extension).
-    """
-    
-    print("Computing Directed PAGA Trajectory...")
-    
-    # 1. PAGA and Clustering (using a copy to protect original adata)
-    adata_temp = adata_sc.copy()
-    sc.tl.leiden(adata_temp, resolution=paga_resolution, key_added='leiden_paga')
-    sc.tl.paga(adata_temp, groups='leiden_paga')
-    
-    # 2. Calculate Cluster Centroids and Average Pseudotime
-    clusters = adata_temp.obs['leiden_paga'].unique().sort_values()
-    umap_centroids = []
-    cluster_pseudotime = []
-    
-    for clus in clusters:
-        mask = adata_temp.obs['leiden_paga'] == clus
-        centroid = np.mean(adata_temp.obsm['X_umap'][mask], axis=0)
-        umap_centroids.append(centroid)
-        avg_pt = np.mean(adata_temp.obs[sc_pseudotime_key][mask])
-        cluster_pseudotime.append(avg_pt)
-        
-    umap_centroids = np.array(umap_centroids)
-    cluster_pseudotime = np.array(cluster_pseudotime)
-    
-    # Identify Root (Cluster with minimum pseudotime)
-    root_idx = np.argmin(cluster_pseudotime)
-    root_coord = umap_centroids[root_idx]
-    
-    fig, ax = plt.subplots(figsize=figsize, dpi=300)
-    
-    # [Layer 1] Background: Single-cell Scatter
-    if sc_colors is None:
-        sc_colors = {cat: color for cat, color in zip(adata_sc.obs[sc_group_col].unique(), sns.color_palette("Set1"))}
-    
-    umap_sc = adata_sc.obsm['X_umap']
-    for cat in sc_order:
-        if cat in adata_sc.obs[sc_group_col].values:
-            mask = (adata_sc.obs[sc_group_col] == cat)
-            ax.scatter(umap_sc[mask, 0], umap_sc[mask, 1], 
-                       c=sc_colors.get(cat, 'grey'),
-                       s=20, alpha=0.15, edgecolors='none', 
-                       rasterized=True, zorder=1, label=cat)
-
-    # [Layer 2] Directed Edges (Arrows)
-    connectivities = adata_temp.uns['paga']['connectivities'].todense()
-    edge_color = '#333333'
-    
-    for i in range(len(clusters)):
-        for j in range(i + 1, len(clusters)):
-            if connectivities[i, j] > threshold:
-                # Direction: Low Pseudotime -> High Pseudotime
-                start_node, end_node = (i, j) if cluster_pseudotime[i] < cluster_pseudotime[j] else (j, i)
-                p1, p2 = umap_centroids[start_node], umap_centroids[end_node]
-                
-                # Draw Line
-                ax.plot([p1[0], p2[0]], [p1[1], p2[1]], c=edge_color, linewidth=2.5, alpha=0.4, zorder=4)
-                # Draw Arrow Head
-                ax.annotate('', xy=(p2[0], p2[1]), xytext=(p1[0], p1[1]),
-                            arrowprops=dict(arrowstyle='-|>', color=edge_color, lw=0, mutation_scale=25), 
-                            zorder=5)
-
-    # [Layer 3] Root Marker and "Start" Label
-    ax.scatter(root_coord[0], root_coord[1], s=500, c='white', marker='D', 
-               edgecolors='black', linewidth=3, zorder=20, label='Trajectory Start')
-               
-    ax.annotate('Start', xy=(root_coord[0], root_coord[1]), 
-                xytext=(root_coord[0] - 1.5, root_coord[1] + 1.5),
-                fontsize=16, fontweight='bold', color='black',
-                arrowprops=dict(facecolor='black', shrink=0.05, width=2, headwidth=10),
-                bbox=dict(boxstyle="round,pad=0.3", fc="white", ec="black", alpha=0.8),
-                zorder=25)
-
-    # [Layer 4] Foreground: Bulk Data (Stars)
-    if adata_bulk is not None:
-        umap_bulk = adata_bulk.obsm['X_umap']
-        bulk_vals = adata_bulk.obs[bulk_group_col]
-        groups_to_plot = bulk_order if bulk_order else np.unique(bulk_vals)
-        
-        for grp in groups_to_plot:
-            if grp in bulk_vals.values:
-                mask = (bulk_vals == grp)
-                color = bulk_colors.get(grp, 'black') if bulk_colors else 'black'
-                ax.scatter(umap_bulk[mask, 0], umap_bulk[mask, 1], c=[color], 
-                           s=450, marker='*', edgecolors='black', linewidth=1.2, zorder=10, label=grp)
-
-    # Final Styling
-    ax.set_xlabel('UMAP1', fontweight='bold', fontsize=16)
-    ax.set_ylabel('UMAP2', fontweight='bold', fontsize=16)
-    ax.set_title(f"{title}", fontweight='bold', fontsize=20, pad=20)
-    
-    # Legend Handling
-    handles, labels = ax.get_legend_handles_labels()
-    # SC Legend
-    sc_leg = ax.legend(handles[:len(adata_sc.obs[sc_group_col].unique())], 
-                       labels[:len(adata_sc.obs[sc_group_col].unique())], 
-                       title="Cell State (SC)", loc='upper left', bbox_to_anchor=(1.02, 1.0), 
-                       fontsize=12, title_fontsize=14)
-    for lh in sc_leg.legend_handles: lh.set_alpha(1); lh.set_sizes([100])
-    ax.add_artist(sc_leg)
-    
-    # Bulk Legend (if exists)
-    if adata_bulk is not None:
-        bulk_leg = ax.legend(handles[-(len(groups_to_plot)):], labels[-(len(groups_to_plot)):], 
-                             title="Timepoints (Bulk)", loc='upper left', bbox_to_anchor=(1.02, 0.75),
-                             fontsize=12, title_fontsize=14)
-    
-    ax.spines['top'].set_visible(False)
-    ax.spines['right'].set_visible(False)
-    sns.despine(ax=ax)
-    ax.tick_params(axis='both', which='major', labelsize=14)
-    plt.subplots_adjust(right=0.70)
-
-    if save_path:
-        fig.savefig(f'{save_path}.png', dpi=300, bbox_inches='tight')
-        fig.savefig(f'{save_path}.pdf', bbox_inches='tight')
-        print(f"PAGA Trajectory plot saved to: {save_path}")
-        
-    return fig, ax
-
 def _freedman_diaconis_bins(x):
     """Helper to calculate optimal bin width."""
     x = np.asarray(x)
@@ -1041,7 +871,7 @@ def plot_shap_custom_features(shap_values, X_train, feature_names, target_featur
             target_indices.append(feature_names.index(feature))
             found_features.append(feature)
         else:
-            print(f"⚠️ Warning: Feature '{feature}' not found in the model features.")
+            print(f"Warning: Feature '{feature}' not found in the model features.")
             
     if not target_indices:
         raise ValueError("No valid target features found to plot.")

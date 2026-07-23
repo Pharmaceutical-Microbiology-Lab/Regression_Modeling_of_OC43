@@ -133,11 +133,33 @@ run_go_enrichment <- function(csv_path,
 }
 
 
-analyze_save <- function(dds_obj, condition , coefficient, control, save_path , lfc_cutoff = 0.58, padj_cutoff = 0.05) {
+#' Perform Differential Expression Analysis using DESeq2 and Save Results
+#'
+#' This function extracts results from a DESeqDataSet object for a specified contrast,
+#' filters for significant DEGs based on log2 fold change and adjusted p-value cutoffs,
+#' and exports both full and filtered DEG tables to CSV files.
+#'
+#' @param dds_obj A DESeqDataSet object containing analyzed expression data.
+#' @param condition Character string specifying the factor/column name in colData.
+#' @param coefficient Character string specifying the treatment group name.
+#' @param control Character string specifying the reference/control group name.
+#' @param save_path Output directory path where CSV files will be saved.
+#' @param lfc_cutoff Numeric cutoff for absolute log2 fold change (default: 0.58, approx 1.5-fold).
+#' @param padj_cutoff Numeric cutoff for adjusted p-value / FDR (default: 0.05).
+#'
+#' @export
+analyze_save <- function(dds_obj, condition, coefficient, control, save_path, lfc_cutoff = 0.58, padj_cutoff = 0.05) {
 
   if (!requireNamespace("tibble", quietly = TRUE)) {
     stop("Package 'tibble' needed for this function to work. Please install it.")
   }
+  if (!requireNamespace("dplyr", quietly = TRUE)) {
+    stop("Package 'dplyr' needed for this function to work. Please install it.")
+  }
+  suppressMessages(library(dplyr, quietly = TRUE))
+  
+  # Ensure save_path ends with a slash
+  save_path <- if (grepl("/$", save_path)) save_path else paste0(save_path, "/")
   
   message(paste("Processing:", coefficient, "versus", control, "..."))
   
@@ -153,8 +175,8 @@ analyze_save <- function(dds_obj, condition , coefficient, control, save_path , 
     as.data.frame() %>%
     dplyr::filter(padj < padj_cutoff & abs(log2FoldChange) > lfc_cutoff)
   
-  write.csv(res_df, file = paste0(save_path, "DEG_results_", coefficient, "_vs_", control, ".csv"), row.names = FALSE, col.names = TRUE)
-  write.csv(sig_deg, file = paste0(save_path, "Sig_DEG_", coefficient, "_vs_", control, "_LFC", lfc_cutoff, ".csv"), row.names = FALSE, col.names = TRUE)
+  write.csv(res_df, file = paste0(save_path, "DEG_results_", coefficient, "_vs_", control, ".csv"), row.names = FALSE)
+  write.csv(sig_deg, file = paste0(save_path, "Sig_DEG_", coefficient, "_vs_", control, "_LFC", lfc_cutoff, ".csv"), row.names = FALSE)
   
   message(paste("Done:", coefficient, "| Found", nrow(sig_deg), "DEGs"))
 }

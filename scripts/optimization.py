@@ -71,14 +71,14 @@ def tune_feature_weights(X, y, feature_names, seed, initial_weights=None, n_tria
         trial_params = {f"weight_{k}": v for k, v in initial_weights.items() if k in feature_names}
         if trial_params:
             study.enqueue_trial(trial_params)
-            print(f"ℹ️ Enqueued initial weights for {len(trial_params)} features.")
+            print(f"Enqueued initial weights for {len(trial_params)} features.")
 
     # Run Optimization
-    print(f"🚀 Starting Feature Weight Optimization ({n_trials} trials)...")
+    print(f"Start Feature Weight Optimization ({n_trials} trials)...")
     optuna.logging.set_verbosity(optuna.logging.INFO) # Suppress generic logs
     study.optimize(objective, n_trials=n_trials)
     
-    print(f"✅ Optimization Complete. Best R2: {study.best_value:.4f}")
+    print(f"Optimization Complete. Best R2: {study.best_value:.4f}")
 
     # Process Best Params into a clean dictionary
     best_weights_map = {}
@@ -147,13 +147,13 @@ def tune_hyperparameters(X, y, seed, feature_weights=None, n_trials=100,
         scores = cross_val_score(model, X, y, cv=cv, scoring='r2')
         return scores.mean()
 
-    print(f"🚀 Starting Hyperparameter Tuning ({n_trials} trials)...")
+    print(f"Start Hyperparameter Tuning ({n_trials} trials)...")
     optuna.logging.set_verbosity(optuna.logging.INFO)
     
     sampler = TPESampler(seed=seed) 
     study = optuna.create_study(direction='maximize', sampler=sampler)
     study.optimize(objective, n_trials=n_trials)
 
-    print(f"✅ Tuning Complete. Best R2: {study.best_value:.4f}")
+    print(f"Tuning Complete. Best R2: {study.best_value:.4f}")
     
     return study.best_params, study
